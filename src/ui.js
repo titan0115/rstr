@@ -24,7 +24,7 @@
     imageName: 'rstr',
     disabled: new Set(), // effect ids hidden from the picker (loaded in boot)
     settingsOpen: false,
-    pre: RSTR.preset.defaultPre(), // global PRE block — always applied first, see preLayer(); always expanded, no collapse state
+    pre: RSTR.preset.defaultPre(), // global PRE working buffer — mirrors the single committed PREPROCESS layer (preLayerRef) at the FRONT of state.mix once non-identity, see reconcilePreLayer(); always expanded, no collapse state
     source: RSTR.preset.defaultSource(), // pinned "◇ ORIGINAL" row (bottom of LAYERS): {enabled, opacity} BASE PLATE composited under the finished stack as a final pass — NOT part of state.mix, see buildMixList()/src/pipeline.js render(). Defaults to enabled:false (see src/preset.js normalizeSource) so the checkbox starts UNCHECKED — turning it on for free would silently fill crt's transparent void and every other alpha-hole effect.
     // user-defined /Effects catalog order + grouping — persisted to
     // localStorage (rstr.effectOrder / rstr.effectGroups), loaded in boot via
@@ -44,16 +44,6 @@
 
   function visibleEffectList() {
     return RSTR.EFFECT_LIST.filter((d) => !d.internal && !state.disabled.has(d.id));
-  }
-
-  // The PENDING PRE pass as a stack layer (empty when identity). PRE is a
-  // live working buffer: it renders at the END of the committed mix (right
-  // under the NEW-mode preview) and gets BAKED into the mix as an explicit
-  // `preprocess` layer by addToMix — it is never serialized as a separate
-  // style-code `pre` block anymore (old codes with one still load, see
-  // applyStyle).
-  function preLayer() {
-    return RSTR.preset.preIsIdentity(state.pre) ? [] : [{ effect: 'preprocess', enabled: true, params: state.pre }];
   }
 
   // The output actually applied to preview/export/style: passthrough when the
@@ -81,18 +71,70 @@
     else if (t.kind === 'layer') state.mix[t.index].params = params;
   }
 
+  // Sets ONLY the "NEW · <fx>" / "EDIT · <fx> [n]" header text and the ADD TO
+  // MIX button's visibility (shown in NEW, hidden once committed to a layer)
+  // — the cheap subset of buildEditor() below that never touches
+  // #active-params. Used by commitNewOnEdit() (and reconcilePreLayer()'s
+  // index bookkeeping) where a full buildEditor() would tear down — and drop
+  // the pointer capture on — the very scrub control an in-flight drag is
+  // mutating.
+  function refreshTargetHeader() {
+    const t = state.editTarget;
+    if (t.kind === 'output') {
+      els.targetHeader.textContent = 'EDIT · OUTPUT';
+      return;
+    }
+    const def = RSTR.getEffect(currentEffectId());
+    els.targetHeader.textContent = t.kind === 'new' ? `NEW · ${def.name}` : `EDIT · ${def.name} [${t.index + 1}]`;
+    els.addBtn.style.display = t.kind === 'new' ? '' : 'none';
+  }
+
+  // Auto-commit: the FIRST param edit made while in NEW mode turns the
+  // preview into a real mix layer and switches editing to it in place — ADD
+  // TO MIX (addToMix() below) stays as an explicit alternative for anyone
+  // who wants to commit without touching a control. A no-op once already
+  // committed (editTarget.kind !== 'new'), so every param handler below can
+  // call this unconditionally on every edit — including every tick of a
+  // drag — without double-committing.
+  function commitNewOnEdit() {
+    if (state.editTarget.kind !== 'new') return;
+    const effectId = state.editTarget.effect;
+    // Commit BY REFERENCE (not a copy): the live param controls captured
+    // this exact params object in their closures — moving the same object
+    // into the layer lets an in-flight scrub drag keep mutating the layer
+    // with no DOM rebuild of the active-params panel (a rebuild mid-drag
+    // would drop the pointer capture). addToMix (the button) still copies —
+    // it's never mid-drag.
+    state.mix.push({ effect: effectId, enabled: true, params: state.editTarget.params });
+    state.editTarget = { kind: 'layer', index: state.mix.length - 1 };
+    buildMixList(); // show + highlight the new layer
+    // Drop the picker's stale "this effect is the NEW preview" highlight —
+    // #effect-list is a separate DOM subtree from #active-params (the live
+    // drag target), so rebuilding it here is safe mid-drag.
+    buildEffectList();
+    refreshTargetHeader(); // "NEW · X" -> "EDIT · X [n]", hide ADD TO MIX
+  }
+
+  // Commit-then-render: the standard tail of every param-control mutation
+  // handler (scrub set / color onChange / select change / text input) —
+  // auto-commits a NEW-mode edit into a layer (see commitNewOnEdit above)
+  // before requesting the frame that shows it.
+  function afterParamEdit() {
+    commitNewOnEdit();
+    requestRender();
+  }
+
   // ---------- rendering ----------
-  // Live canvas = the enabled mix, then the pending PRE, then (in NEW mode)
-  // the picked effect on top — exactly the order addToMix commits, so the
-  // preview never jumps when a layer is added.
+  // Live canvas = the enabled mix (PRE, when non-identity, is already a
+  // normal committed layer in there — see reconcilePreLayer), then, in NEW
+  // mode, the picked effect on top — exactly the order commitNewOnEdit()/
+  // addToMix() commit, so the preview never jumps when a layer is added.
   function livePreviewStack() {
     const enabled = state.mix.filter((s) => s.enabled !== false);
     if (state.editTarget.kind === 'new') {
-      return enabled.concat(preLayer(), [
-        { effect: state.editTarget.effect, enabled: true, params: state.editTarget.params },
-      ]);
+      return enabled.concat([{ effect: state.editTarget.effect, enabled: true, params: state.editTarget.params }]);
     }
-    return enabled.concat(preLayer());
+    return enabled;
   }
 
   function requestRender() {
@@ -1176,7 +1218,7 @@
         get: () => (params[param.key] != null ? params[param.key] : param.default),
         set: (v) => {
           params[param.key] = v;
-          requestRender();
+          afterParamEdit(); // auto-commits a NEW-mode target into a layer, see commitNewOnEdit()
         },
         format: (v) => Number(v).toFixed(decimals),
         reset: param.default,
@@ -1211,7 +1253,7 @@
           params[param.key] = hex;
           box.style.background = hex;
           label.textContent = hex;
-          requestRender();
+          afterParamEdit(); // auto-commits a NEW-mode target into a layer, see commitNewOnEdit()
         });
       });
       row.appendChild(btn);
@@ -1226,6 +1268,12 @@
       }
       select.addEventListener('change', () => {
         params[param.key] = Number(select.value);
+        // Commit BEFORE the showIf rebuild below, so if it runs it rebuilds
+        // the panel in the now-committed layer context (currentEffectId()/
+        // currentParams() already resolve through state.mix, not the stale
+        // NEW target) — see commitNewOnEdit(). Not mid-drag (a discrete
+        // 'change' event), so the rebuild itself is safe here.
+        commitNewOnEdit();
         // If other params show/hide based on THIS select (e.g. dots' `mode`),
         // rebuild the panel so the visible param set updates immediately.
         const def = RSTR.getEffect(currentEffectId());
@@ -1246,7 +1294,7 @@
       input.style.minWidth = '0';
       input.addEventListener('input', () => {
         params[param.key] = input.value;
-        requestRender();
+        afterParamEdit(); // auto-commits a NEW-mode target into a layer, see commitNewOnEdit()
       });
       row.appendChild(input);
     }
@@ -1371,6 +1419,7 @@
       paintBar();
       paintFlags();
       refreshSelectedRow();
+      commitNewOnEdit(); // auto-commits a NEW-mode target into a layer, see commitNewOnEdit()
       requestRender();
     }
 
@@ -1395,6 +1444,7 @@
         getStops()[i].pos = pos;
         flag.style.left = pos * 100 + '%'; // in-place — no track rebuild mid-drag
         paintBar();
+        commitNewOnEdit(); // auto-commits a NEW-mode target into a layer, see commitNewOnEdit()
         requestRender();
       });
       const release = (e) => {
@@ -1449,6 +1499,7 @@
       selectedIndex = stops.length - 1;
       paintFlags();
       refreshSelectedRow();
+      commitNewOnEdit(); // auto-commits a NEW-mode target into a layer, see commitNewOnEdit()
       requestRender();
     });
 
@@ -1460,6 +1511,7 @@
         stops[idx].color = hex;
         refreshSelectedRow();
         paintBar();
+        commitNewOnEdit(); // auto-commits a NEW-mode target into a layer, see commitNewOnEdit()
         requestRender();
       });
     });
@@ -1858,20 +1910,17 @@
   }
 
   // ---------- ADD (NEW mode only) ----------
+  // PRE is no longer glued to the next ADDed effect — it's its own
+  // independent, auto-committed layer (see reconcilePreLayer) that lives
+  // entirely outside this flow now.
   function addToMix() {
     if (state.editTarget.kind !== 'new') return;
     const effectId = state.editTarget.effect;
-    // Bake the pending PRE into the mix as its own layer, glued right under
-    // the effect it was dialed in for, then reset the PRE working buffer —
-    // the settings "leave" with the committed layer.
-    for (const l of preLayer()) state.mix.push({ ...l, params: { ...l.params } });
-    state.pre = RSTR.preset.defaultPre();
     state.mix.push({ effect: effectId, enabled: true, params: { ...state.editTarget.params } });
     // Jump straight to EDIT on the committed layer — staying in NEW mode would
     // keep the picked effect previewed ON TOP of the layer just added, i.e.
     // the effect applied twice until the user clicks elsewhere.
     selectLayer(state.mix.length - 1);
-    syncPreUI();
     showToast(`Added ${RSTR.getEffect(effectId).name} to mix`);
   }
 
@@ -2573,6 +2622,15 @@
   function removeLayer(index) {
     const removed = state.mix[index];
     state.mix.splice(index, 1);
+    if (removed === preLayerRef) {
+      // The user removed the committed PREPROCESS layer directly from the
+      // stack (its own ✕ button) — release the PRE module back to its own
+      // default instead of leaving it silently pointing at a layer that no
+      // longer exists.
+      preLayerRef = null;
+      state.pre = RSTR.preset.defaultPre();
+      syncPreUI();
+    }
     if (state.editTarget.kind === 'layer') {
       if (state.editTarget.index === index) {
         // was editing the removed layer — fall back to NEW mode on that effect
@@ -2593,8 +2651,75 @@
   // afterwards mutates state.pre + calls syncPreUI() to refresh
   // transforms/labels/positions in place — never a DOM rebuild, so an
   // in-flight pointer-capture drag survives its own event handler re-running.
+  // On top of that, every change reconciles a single committed PREPROCESS
+  // mix layer (reconcilePreLayer, below) — PRE is edited live through this
+  // module, but it's a normal, independent stack layer, not a special case.
   const preEls = {}; // populated once by buildPreSection()
   const PRE_SCRUB_KEYS = ['blur', 'grain', 'gamma'];
+
+  // The single committed 'preprocess' layer object living in state.mix (at
+  // the FRONT — applied first, global preprocessing), or null when PRE is at
+  // identity and nothing is committed. Tracked BY REFERENCE so a LAYERS drag
+  // reordering it, or any other code holding onto the same object, still
+  // resolves correctly via state.mix.indexOf(preLayerRef) below.
+  let preLayerRef = null;
+
+  // Keeps editTarget's [n] pointing at the same logical layer across
+  // reconcilePreLayer()'s own insert/remove of the PREPROCESS layer — same
+  // index bookkeeping removeLayer() already does for a manual removal, so
+  // EDIT never silently re-targets onto the wrong layer.
+  function adjustEditIndexForInsertAtFront() {
+    if (state.editTarget.kind === 'layer') {
+      state.editTarget.index += 1;
+      refreshTargetHeader(); // keep the displayed "EDIT · X [n]" in sync
+    }
+  }
+  function adjustEditIndexForRemoval(removedIndex) {
+    if (state.editTarget.kind !== 'layer') return;
+    if (state.editTarget.index === removedIndex) {
+      // Was directly EDITing the just-removed PREPROCESS layer itself (e.g.
+      // clicked its own row in the mix list) — redirect to a safe target.
+      // 'preprocess' is internal (not in the NEW-mode picker), so unlike
+      // removeLayer()'s selectEffect(removed.effect) fallback there's no
+      // sensible NEW-mode target to fall back to; OUTPUT always exists.
+      state.editTarget = { kind: 'output' };
+      buildEditor();
+    } else if (state.editTarget.index > removedIndex) {
+      state.editTarget.index -= 1;
+      buildEditor(); // refresh the [n] index in the header — same as removeLayer()
+    }
+  }
+
+  // Reconciles state.mix's committed PREPROCESS layer with the live PRE
+  // working buffer (state.pre) — called on every PRE change (onPreChange).
+  // Non-identity => exactly one 'preprocess' layer at the FRONT of the stack
+  // (applied first); back to identity => that layer is removed. No
+  // fragmentation (unlike the old "glued under the next ADDed effect" bake)
+  // and no reset — PRE is now a normal, independently-edited layer that just
+  // happens to have a dedicated always-visible editor (this module) instead
+  // of living behind EDIT/NEW.
+  function reconcilePreLayer() {
+    const identity = RSTR.preset.preIsIdentity(state.pre);
+    if (identity) {
+      if (preLayerRef) {
+        const i = state.mix.indexOf(preLayerRef);
+        if (i >= 0) {
+          state.mix.splice(i, 1);
+          adjustEditIndexForRemoval(i);
+        }
+        preLayerRef = null;
+        buildMixList();
+      }
+      return;
+    }
+    if (!preLayerRef) {
+      preLayerRef = { effect: 'preprocess', enabled: true, params: {} };
+      state.mix.unshift(preLayerRef); // FRONT = applied first, mirrors applyStyle's legacy-`pre` unshift
+      adjustEditIndexForInsertAtFront();
+      buildMixList();
+    }
+    preLayerRef.params = { ...state.pre }; // keep the committed layer's values in sync
+  }
 
   function formatPreValue(key, v) {
     if (key === 'blur' || key === 'blackPoint' || key === 'whitePoint') return String(Math.round(v));
@@ -2648,6 +2773,7 @@
   function onPreChange() {
     requestRender();
     syncPreUI();
+    reconcilePreLayer(); // keep the committed PREPROCESS mix layer in sync — see reconcilePreLayer()
   }
 
   // Refresh every PRE visual (dot, knob ticks/labels, handle positions,
@@ -2708,7 +2834,7 @@
     header.className = 'pre-header';
     const title = document.createElement('span');
     title.className = 'pre-title';
-    title.textContent = 'Pre';
+    title.textContent = 'Preprocess'; // rendered uppercase by the global CSS text-transform, matches the committed layer's own display name (effects.js 'preprocess'.name)
     const dot = document.createElement('span');
     dot.className = 'pre-dot';
     dot.textContent = '●';
@@ -2976,7 +3102,7 @@
   function exportImage() {
     if (!pipeline.hasImage()) return showToast('Load an image first');
     pipeline.applyOutput(effectiveOutput());
-    pipeline.render(state.mix.concat(preLayer()), state.source); // committed look + pending PRE, not the NEW-mode preview
+    pipeline.render(state.mix, state.source); // committed look (PRE, if any, is already a normal layer in state.mix — see reconcilePreLayer), not the NEW-mode preview
     pipeline.toBlob((blob) => {
       const ext = RSTR.preset.extForFormat(effectiveOutput().format);
       const a = document.createElement('a');
@@ -2989,8 +3115,10 @@
   }
 
   function copyStyleCode() {
-    // Pending PRE goes out as an explicit trailing `preprocess` stack layer.
-    const preset = RSTR.preset.finalizePreset(state.imageName, state.mix.concat(preLayer()), effectiveOutput(), null, state.source);
+    // PRE (if non-identity) is already a normal committed `preprocess` layer
+    // at the front of state.mix — see reconcilePreLayer() — so it serializes
+    // like any other layer, no separate concat needed.
+    const preset = RSTR.preset.finalizePreset(state.imageName, state.mix, effectiveOutput(), null, state.source);
     const text = JSON.stringify(preset, null, 2);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(
@@ -3010,15 +3138,24 @@
   function applyStyle(style) {
     const stack = RSTR.preset.stackToEditable(style.stack);
     // Legacy style codes carry a separate `pre` block that rendered FIRST —
-    // convert it to an explicit head `preprocess` layer (same look), since
-    // state.pre is now a live working buffer that always starts clean.
+    // convert it to an explicit head `preprocess` layer (same look).
     if (style.pre && !RSTR.preset.preIsIdentity(style.pre)) {
       stack.unshift({ effect: 'preprocess', enabled: true, params: RSTR.preset.normalizePre(style.pre) });
     }
     state.mix = stack;
     state.output = RSTR.preset.normalizeOutput(style.output);
     state.outputEnabled = true;
-    state.pre = RSTR.preset.defaultPre();
+    // A `preprocess` layer at the FRONT of the loaded stack IS the committed
+    // PRE layer (see reconcilePreLayer) — track it as preLayerRef and mirror
+    // its params into state.pre so the PRE module edits it live; otherwise
+    // PRE starts clean with nothing committed, same as resetStyle().
+    if (stack.length && stack[0].effect === 'preprocess') {
+      preLayerRef = stack[0];
+      state.pre = { ...preLayerRef.params };
+    } else {
+      preLayerRef = null;
+      state.pre = RSTR.preset.defaultPre();
+    }
     state.source = RSTR.preset.normalizeSource(style.source);
     goNewMode();
     buildMixList();
@@ -3063,7 +3200,9 @@
         pendingOverwrite = name;
         return `“${name}” exists — press OK again to overwrite`;
       }
-      const style = RSTR.preset.finalizePreset(name, state.mix.concat(preLayer()), effectiveOutput(), null, state.source);
+      // PRE (if non-identity) is already a normal committed `preprocess`
+      // layer at the front of state.mix — see reconcilePreLayer().
+      const style = RSTR.preset.finalizePreset(name, state.mix, effectiveOutput(), null, state.source);
       RSTR.preset.saveStyleToLibrary(name, style);
       pendingOverwrite = null;
       buildStyleSelect();
@@ -3383,6 +3522,7 @@
 
   function resetStyle() {
     state.mix = [];
+    preLayerRef = null; // state.mix is gone, so any committed PREPROCESS layer reference is stale
     state.output = RSTR.preset.defaultOutput();
     state.outputEnabled = true;
     state.pre = RSTR.preset.defaultPre();

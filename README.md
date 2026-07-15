@@ -1,3 +1,5 @@
+![RSTR — an open-source stylisation tool designed for human-agentic workflow](assets/hero.jpg)
+
 # RSTR
 
 A local, brutalist, grayscale, shader-based image-effects tool with two heads sharing one shader pipeline and one preset ("style code") format. Formerly named **SHDR**.
