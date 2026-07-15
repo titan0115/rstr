@@ -1,0 +1,46 @@
+{
+  "v": 1,
+  "name": "my-retro",
+  "stack": [
+    {
+      "effect": "adjust",
+      "enabled": true,
+      "params": {
+        "brightness": 0.1,
+        "contrast": 0.2,
+        "saturation": -0.3,
+        "gamma": 1
+      }
+    },
+    {
+      "effect": "pixelate",
+      "enabled": true,
+      "params": {
+        "size": 6
+      }
+    },
+    {
+      "effect": "dither",
+      "enabled": true,
+      "params": {
+        "levels": 2,
+        "palette": 0
+      }
+    }
+  ],
+  "output": {
+    "crop": {
+      "ratio": "original",
+      "align": "C"
+    },
+    "scale": {
+      "mode": "none",
+      "size": null,
+      "width": null,
+      "height": null
+    },
+    "format": "png",
+    "quality": 0.92
+  },
+  "id": "rstr_d988923b"
+}

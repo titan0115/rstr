@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" href="favicon.ico">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSTR</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #000000;
+    --panel-2: #111111;
+    --border: #333333;
+    --border-dim: #2a2a2a;
+    --text: #eeeeee;
+    --text-2: #bbbbbb;
+    --muted: #666666;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text-2);
+    font: 12px/1.35 ui-monospace, "JetBrains Mono", "SF Mono", Consolas, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  #app {
+    display: grid;
+    grid-template-columns: 170px 280px 1fr;
+    height: 100vh;
+  }
+  /* ---- column 1: navigation (wordmark · /Effects list · /Styles library) ---- */
+  #nav-panel {
+    grid-column: 1;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  #nav-panel h1 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    margin: 0;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  /* /Styles — fixed header block at the top of column 1, never scrolls */
+  #styles-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #styles-bar select { width: 100%; }
+  .styles-row { display: flex; gap: 4px; }
+  .styles-row button { flex: 1 1 auto; }
+  .styles-full-btn { width: 100%; }
+  /* whole-library backup/restore disclosure (2026-07-13) — rarely used, so
+     it hides behind one flat toggle instead of two permanent buttons; mirrors
+     .group-header's muted/no-invert hover rather than a normal button's. */
+  .styles-disclose-btn {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .styles-disclose-btn:hover { background: transparent; color: var(--text); border-color: var(--text); }
+  #reset-btn { width: 100%; margin-top: 8px; }
+
+  /* /Effects — the ONLY scrollable region in column 1 */
+  .section-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .section-label-row .section-label { margin-bottom: 0; }
+  .effects-section {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .effects-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .effects-scroll::-webkit-scrollbar { width: 8px; }
+  .effects-scroll::-webkit-scrollbar-track { background: var(--panel-2); border-left: 1px solid var(--border-dim); }
+  .effects-scroll::-webkit-scrollbar-thumb { background: var(--border); border: 1px solid var(--border-dim); }
+  .effects-scroll::-webkit-scrollbar-thumb:hover { background: var(--text); }
+
+  /* ---- column 2: workbench (PRE · MIX · edit panel · pinned footer) ---- */
+  #panel {
+    grid-column: 2;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    position: relative; /* anchors the color-picker popover (see #color-picker-popover) */
+  }
+  /* pinned editor actions (Save/Del presets + ADD + EXPORT) — outside the scroll area */
+  #editor-actions {
+    padding: 6px 8px;
+    border-top: 1px solid var(--border);
+  }
+  #export-btn { width: 100%; }
+  #inline-input {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+  #inline-field { width: 100%; resize: vertical; text-transform: none; letter-spacing: 0; }
+  .inline-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  #inline-error { color: var(--text); font-size: 10px; text-transform: none; letter-spacing: 0; }
+  /* tabs */
+  #tab-strip {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    flex: 1;
+    border: none;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    padding: 6px 8px;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { background: var(--text); color: #000; }
+  #tab-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .section {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-dim);
+  }
+  .section-label {
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    margin-bottom: 4px;
+  }
+  #active-name { color: var(--text); font-weight: 700; }
+  /* grouped effect list */
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    margin: 6px 0 3px;
+    padding: 2px 2px 2px 0;
+    border: 1px solid transparent;
+    border-bottom-color: var(--border-dim);
+    cursor: grab;
+  }
+  .group-header:first-child { margin-top: 0; }
+  .group-header:hover { color: var(--text); }
+  .group-header.drop-into { background: var(--border-dim); }
+  .group-header.drop-before { border-top-color: var(--text); }
+  .group-header.drop-after { border-bottom-color: var(--text); }
+  .group-arrow { flex-shrink: 0; }
+  .group-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: text;
+  }
+  .group-name:hover { color: var(--text); text-decoration: underline; }
+  .icon-btn-sm { width: 14px; height: 14px; font-size: 9px; flex-shrink: 0; }
+  .group-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+  .effect-row {
+    text-align: left;
+    padding: 3px 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-dim);
+    color: var(--text-2);
+    cursor: pointer;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .effect-row:hover { color: var(--text); border-color: var(--border); }
+  .effect-row.active {
+    color: #000;
+    background: var(--text);
+    border-color: var(--text);
+  }
+  .effect-row.grouped { margin-left: 10px; }
+  .effect-row.drop-before { border-top-color: var(--text); }
+  .effect-row.drop-after { border-bottom-color: var(--text); }
+  /* active params */
+  #active-params { margin-bottom: 6px; }
+  /* scrub bars — shared range control (PRE block + effect params) */
+  .scrub {
+    position: relative;
+    height: 20px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-dim);
+    margin: 3px 0;
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
+    overflow: hidden;
+  }
+  .scrub:hover { border-color: var(--text); }
+  .scrub-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    background: var(--border-dim);
+    pointer-events: none;
+  }
+  .scrub-label,
+  .scrub-value {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .scrub-label { left: 6px; color: var(--muted); }
+  .scrub-value {
+    right: 6px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  /* click-to-type readout (opt-in via makeScrub's `editable`) — swapped in
+     place of .scrub-value at the same spot, sized to fit inside the 20px bar. */
+  .scrub-edit-input {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    width: 52px;
+    height: 14px;
+    padding: 0 2px;
+    font-size: 11px;
+    line-height: 14px;
+    text-align: right;
+    background: var(--panel);
+    border: 1px solid var(--text);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .param-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+  }
+  .param-label {
+    width: 76px;
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .param-value {
+    width: 40px;
+    text-align: right;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+  }
+  #add-btn { width: 100%; margin-top: 8px; }
+  .ascii-copy-btn { width: 100%; margin-top: 6px; }
+  .reverse-colors-btn { width: 100%; margin-top: 6px; }
+  /* editor target header + editors */
+  .target-header-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .target-header-row .section-label { margin-bottom: 0; }
+  #target-header { color: var(--text); font-weight: 700; }
+  .target-header-spacer { flex: 1; }
+  #output-editor { display: none; }
+  #settings-panel { display: none; }
+  #dims-readout {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-dim);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .out-group-label {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    margin: 8px 0 3px;
+    border-bottom: 1px solid var(--border-dim);
+    padding-bottom: 2px;
+  }
+  .out-group-label:first-child { margin-top: 0; }
+  /* mix list */
+  .stack-empty {
+    color: var(--muted);
+    padding: 8px 2px;
+    text-align: center;
+  }
+  .mix-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-dim);
+    padding: 3px 6px;
+    margin-bottom: 4px;
+    cursor: pointer;
+  }
+  .mix-item.disabled { opacity: 0.45; }
+  .mix-item.output-layer { border-color: var(--border); }
+  .mix-item.source-layer { border-color: var(--border); cursor: default; }
+  .mix-item.selected { background: var(--text); border-color: var(--text); }
+  .mix-item.selected .mix-title { color: #000; }
+  .mix-item.selected .icon-btn { color: #000; border-color: #000; }
+  /* MASK (2026-07-12): a mask layer is never composited/drawn, so its row
+     reads as "not drawn" — dashed border + italic title, grayscale only
+     (no color, per brutalism). The row it feeds gets a thicker left edge —
+     a subtle "something upstream is shaping this" cue, still grayscale. */
+  .mix-item.mask-layer { border-style: dashed; }
+  .mix-item.mask-layer .mix-title { font-style: italic; font-weight: 400; }
+  .mix-item.mask-target { border-left: 3px solid var(--text-2); }
+  /* LAYERS drag-to-reorder (2026-07-13) — same 1px insertion-line idiom as
+     .effect-row/.group-header above, reused for the mix stack. The whole row
+     is the drag source now (no dedicated grip — "grab it anywhere"), so the
+     grab/grabbing cursor lives on the row itself; excludes the two pinned
+     rows (OUTPUT/ORIGINAL), which are drop targets only, never draggable. */
+  .mix-item.drop-before { border-top-color: var(--text); }
+  .mix-item.drop-after { border-bottom-color: var(--text); }
+  .mix-item:not(.output-layer):not(.source-layer) { cursor: grab; }
+  .mix-item:not(.output-layer):not(.source-layer):active { cursor: grabbing; }
+  /* eye affordance (replaces the old enable/disable checkbox) — same
+     .icon-btn base as ✕/MASK/INV, just an inline SVG instead of text. */
+  .icon-btn.eye-btn { display: flex; align-items: center; justify-content: center; }
+  .mix-row-top { display: flex; align-items: center; gap: 6px; }
+  .mix-title { flex: 1; font-weight: 700; }
+  .mix-badge {
+    flex: 0 0 auto;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border: 1px solid var(--border-dim);
+    padding: 0 3px;
+    line-height: 14px;
+    white-space: nowrap;
+  }
+  .mix-controls { display: flex; gap: 2px; }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border-dim);
+    color: var(--muted);
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    font-size: 11px;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--text); }
+  /* per-layer blend + opacity — one thin row under the row content: blend
+     select left (fixed width), opacity scrub right (fills the rest). Reuses
+     the standard .scrub type size (no new font-size step). */
+  .mix-controls-row { display: flex; align-items: center; gap: 4px; }
+  .mix-blend {
+    flex: 0 0 auto;
+    width: 96px;
+    height: 16px;
+    padding: 0 2px;
+    font-size: 10px;
+  }
+  .mix-opacity { flex: 1; height: 16px; margin: 0; }
+  /* MASK / INVERT toggle buttons — same .icon-btn base as the ↑↓✕ row, just
+     auto-width for the wider label. .active mirrors .tab-btn.active's
+     grayscale invert (background var(--text), no color). */
+  .mix-mask-btn { width: auto; padding: 0 4px; font-size: 9px; letter-spacing: 0.03em; }
+  .mix-mask-btn.active { background: var(--text); color: #000; border-color: var(--text); }
+  .mix-mask-note { flex: 1; color: var(--muted); font-size: 10px; font-style: italic; }
+  /* blend-mode trigger button (replaces the old native <select>) + its
+     popover — grayscale/1px/square, same 10px type as .mix-blend. */
+  .blend-dd-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+  }
+  .blend-dd-trigger.open { border-color: var(--text); }
+  .blend-dd-trigger .blend-dd-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .blend-dd-trigger .blend-dd-caret { flex-shrink: 0; margin-left: 3px; color: var(--muted); }
+  #blend-dd-popover {
+    position: absolute;
+    z-index: 22;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 2px;
+    display: none;
+    width: 150px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .blend-dd-group {
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    padding: 3px 6px 2px;
+    margin-top: 2px;
+    border-top: 1px solid var(--border-dim);
+  }
+  .blend-dd-group:first-child { margin-top: 0; border-top: none; }
+  .blend-dd-row {
+    padding: 3px 6px;
+    font-size: 10px;
+    color: var(--text-2);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .blend-dd-row.highlighted { background: var(--text); color: #000; }
+  /* settings view */
+  .settings-hint {
+    color: var(--muted);
+    font-size: 10px;
+    margin-bottom: 6px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 2px;
+    cursor: pointer;
+  }
+  .settings-row:hover { color: var(--text); }
+  .settings-row input { flex: 0 0 auto; }
+  .settings-row.grouped { margin-left: 14px; }
+  /* ---- PRE module (pinned global preprocessing block) ---- */
+  .pre-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .pre-title { color: var(--text); font-weight: 700; }
+  .pre-dot {
+    color: var(--text);
+    font-size: 8px;
+    visibility: hidden;
+  }
+  .pre-dot.active { visibility: visible; }
+  .pre-spacer { flex: 1; }
+  .pre-mini-btn, .mini-btn { padding: 2px 6px; font-size: 10px; }
+  .pre-body { margin-top: 8px; }
+  .pre-scrubs { margin-bottom: 8px; }
+  .pre-track {
+    position: relative;
+    height: 12px;
+    display: flex;
+    border: 1px solid var(--border);
+    margin-bottom: 6px;
+  }
+  .pre-track-block { flex: 1 1 0; height: 100%; }
+  .pre-handle {
+    position: absolute;
+    top: 1px;
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--text);
+    transform: translateX(-50%);
+    cursor: ew-resize;
+    touch-action: none;
+  }
+  .pre-handle-bp { background: #000000; }
+  .pre-handle-wp { background: #eeeeee; }
+  .pre-levels-readout {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  /* output tab rows */
+  .out-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+  }
+  .out-row > span:first-child {
+    width: 70px;
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .out-row select, .out-row input { flex: 1; min-width: 0; }
+  /* 3x3 Figma-style crop-anchor picker */
+  #align-picker {
+    display: grid;
+    grid-template-columns: repeat(3, 15px);
+    grid-template-rows: repeat(3, 15px);
+    gap: 2px;
+  }
+  .align-cell {
+    width: 15px;
+    height: 15px;
+    padding: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--border-dim);
+    cursor: pointer;
+  }
+  .align-cell:hover { border-color: var(--text); }
+  .align-cell.active { background: var(--text); border-color: var(--text); }
+  /* ---- right canvas ---- */
+  #canvas-wrap {
+    grid-column: 3;
+    position: relative;
+    overflow: hidden; /* viewport: transformed canvas is clipped here */
+    /* checkerboard stays FIXED on the container so panning reveals more of it */
+    background-color: #000000;
+    background-image:
+      linear-gradient(45deg, #1c1c1c 25%, transparent 25%),
+      linear-gradient(-45deg, #1c1c1c 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1c1c1c 75%),
+      linear-gradient(-45deg, transparent 75%, #1c1c1c 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  }
+  /* transformed wrapper (pan + zoom); sized to the canvas so the crop guide
+     (inset:0) tracks the image exactly under any transform. */
+  #canvas-transform {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    line-height: 0;
+    will-change: transform;
+  }
+  /* display at the canvas's TRUE pixel size (no width/height:100% => no stretch);
+     the wrapper transform handles fit/zoom. image-rendering:pixelated keeps an
+     upscaled low-res working buffer crisp (correct for a 1-bit/halftone tool)
+     instead of a blurry smear. */
+  #gl-canvas { display: none; image-rendering: pixelated; }
+  #gl-canvas.visible { display: block; }
+  /* center-crop guide overlay (grayscale, no hue) */
+  #crop-guide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  #crop-guide.show { display: block; }
+  #crop-guide::before, #crop-guide::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  #crop-guide::before {
+    background:
+      linear-gradient(to right, transparent calc(33.333% - 0.5px), rgba(255,255,255,0.35) calc(33.333% - 0.5px), rgba(255,255,255,0.35) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px)),
+      linear-gradient(to right, transparent calc(66.666% - 0.5px), rgba(255,255,255,0.35) calc(66.666% - 0.5px), rgba(255,255,255,0.35) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px));
+  }
+  #crop-guide::after {
+    background:
+      linear-gradient(to bottom, transparent calc(33.333% - 0.5px), rgba(255,255,255,0.35) calc(33.333% - 0.5px), rgba(255,255,255,0.35) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px)),
+      linear-gradient(to bottom, transparent calc(66.666% - 0.5px), rgba(255,255,255,0.35) calc(66.666% - 0.5px), rgba(255,255,255,0.35) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px));
+  }
+  /* anchor marker — shows which region the crop keeps (reflects align) */
+  #crop-guide-anchor {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    background: #eee;
+    border: 1px solid #000;
+    transform: translate(-50%, -50%);
+    left: 50%;
+    top: 50%;
+  }
+  #dropzone {
+    position: absolute;
+    inset: 16px;
+    border: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    text-align: center;
+    cursor: pointer;
+    padding: 20px;
+  }
+  #dropzone.hidden { display: none; }
+  #dropzone.drag-over { border-color: var(--text); color: var(--text); }
+  /* NEW IMAGE / reset control — only while an image is loaded */
+  #new-image-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 5;
+    display: none;
+  }
+  #new-image-btn.show { display: inline-block; }
+  /* settings gear — pinned to the top-right corner of the canvas viewport */
+  #settings-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    width: 28px;
+    padding: 4px 0;
+    text-align: center;
+  }
+  #settings-btn.active { background: var(--text); color: #000; }
+  /* viewport controls — zoom slider, %, Fit / 100% (only while an image is loaded) */
+  #viewport-controls {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 4px 6px;
+  }
+  #viewport-controls.show { display: flex; }
+  #viewport-controls input[type="range"] { width: 110px; }
+  #zoom-readout {
+    width: 42px;
+    text-align: right;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+  }
+  /* ---- shared controls (grayscale, square, 1px) ---- */
+  button, select, input {
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 4px 8px;
+    accent-color: #eeeeee;
+  }
+  button { cursor: pointer; font-weight: 700; }
+  button:hover { background: var(--text); color: #000; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 1px solid #ffffff;
+    outline-offset: 1px;
+  }
+  /* range: track #2a2a2a, square thumb #eee */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    padding: 0;
+    height: 14px;
+    border: none;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--border-dim);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    background: #eeeeee;
+    border: none;
+    border-radius: 0;
+    margin-top: -4px;
+  }
+  input[type="range"]::-moz-range-track { height: 2px; background: var(--border-dim); }
+  input[type="range"]::-moz-range-thumb {
+    width: 10px; height: 10px; background: #eeeeee; border: none; border-radius: 0;
+  }
+  /* color param: swatch button replacing native input[type=color] */
+  .color-swatch-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+  }
+  .color-swatch-box {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+  .color-swatch-label {
+    font-variant-numeric: tabular-nums;
+  }
+  /* shared HSV color-picker popover — singleton, lives outside any rebuilt
+     container (appended directly to #panel), repositioned per invocation.
+     Chrome is grayscale/1px-border/square; the SV + hue canvases are content
+     (allowed to be colorful). No transitions. */
+  #color-picker-popover {
+    position: absolute;
+    z-index: 20;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 8px;
+    display: none;
+  }
+  .cp-sv-wrap, .cp-hue-wrap {
+    position: relative;
+    line-height: 0;
+    margin-bottom: 6px;
+  }
+  .cp-sv-canvas, .cp-hue-canvas { display: block; cursor: crosshair; }
+  .cp-marker {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    background: transparent;
+    border: 1px solid #fff;
+    outline: 1px solid #000;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .cp-hex-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cp-hex-preview {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+  .cp-hex-input {
+    flex: 1;
+    min-width: 0;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  /* per-effect presets — brutalist modal overlay (replaces the old cramped
+     footer preset-row); backdrop + centered panel, both absolute inside
+     #panel (same anchoring convention as #color-picker-popover). */
+  #presets-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 29;
+  }
+  #presets-modal {
+    position: absolute;
+    z-index: 30;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 240px;
+    max-height: 70%;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 8px;
+  }
+  .presets-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-weight: 700;
+  }
+  #presets-list {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 6px;
+  }
+  .presets-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    background: var(--panel);
+    border: 1px solid var(--border-dim);
+    margin-bottom: 3px;
+    cursor: pointer;
+  }
+  .presets-row:hover { color: var(--text); border-color: var(--text); }
+  .presets-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #toast {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #toast.show { opacity: 1; }
+  /* gradient stops (Figma-style) — gradientmap's `stops` param. Chrome stays
+     grayscale/1px/square/no-transition; the bar's PAINTED CONTENT is the one
+     deliberately colorful surface (it's the actual gradient). */
+  .param-row-stops { margin-bottom: 6px; }
+  .stops-label-row { margin-bottom: 4px; }
+  .stops-bar-wrap { margin-bottom: 4px; }
+  .stops-bar {
+    display: block;
+    width: 100%;
+    height: 24px;
+    border: 1px solid var(--border);
+    cursor: copy; /* double-click adds a stop */
+  }
+  .stops-flags-track {
+    position: relative;
+    height: 12px;
+    margin-top: 2px;
+  }
+  .stop-flag {
+    position: absolute;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    transform: translateX(-50%);
+    cursor: ew-resize;
+    touch-action: none;
+  }
+  .stop-flag:hover { border-color: var(--text); }
+  .stop-flag.selected { background: var(--text); border-color: var(--text); }
+  .stops-selected-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stops-del-btn { padding: 3px 6px; font-size: 10px; }
+  .stops-del-btn:disabled { opacity: 0.35; cursor: default; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="nav-panel">
+    <h1>RSTR</h1>
+
+    <!-- /Styles: fixed header block, always visible, never scrolls — library
+         dropdown + Save/Del/Copy/Paste + the engine bridge/backup actions +
+         the global Reset action. -->
+    <div class="section">
+      <div class="section-label">/Styles</div>
+      <div id="styles-bar">
+        <select id="style-select" title="Saved styles"><option value="">— styles —</option></select>
+        <div class="styles-row">
+          <button id="style-save-btn" title="Save current style to library">Save</button>
+          <button id="style-del-btn" title="Delete selected saved style">Del</button>
+        </div>
+        <div class="styles-row">
+          <button id="copy-btn" title="Copy style code to clipboard">Copy code</button>
+          <button id="export-presets-btn" title="Write the selected style to presets/ for the batch engine">&rarr; Presets</button>
+        </div>
+        <!-- Paste is gone as a dedicated button — the global Ctrl+V handler
+             (anywhere on the page) already runs a style code through this
+             same parseStyleCode/applyStyle path. Whole-library backup/restore
+             is needed rarely, so it stays collapsed behind one disclosure
+             toggle instead of two permanent buttons. -->
+        <button id="backup-toggle-btn" class="styles-disclose-btn" title="Whole-library backup/restore">&#9656; Backup</button>
+        <div id="backup-row" class="styles-row" style="display:none">
+          <button id="library-export-btn" title="Download the whole style library as one JSON (backup)">Export all</button>
+          <button id="library-import-btn" title="Restore styles from a library JSON backup">Import</button>
+        </div>
+        <input type="file" id="library-import-input" accept="application/json" style="display:none">
+      </div>
+      <button id="reset-btn">Reset</button>
+    </div>
+
+    <!-- /Effects: drag-reorderable, user-groupable list; the ONLY scrolling
+         region in column 1. ⚙ on the canvas overlay swaps effect-list for
+         the enable/disable checklist (settings-panel) below, same order. -->
+    <div class="section effects-section">
+      <div class="section-label-row">
+        <span class="section-label">/Effects</span>
+        <button id="add-group-btn" class="mini-btn" title="Create a group">+</button>
+      </div>
+      <div id="effects-scroll" class="effects-scroll">
+        <div id="effect-list"></div>
+        <div id="settings-panel">
+          <div class="settings-hint">Unchecked effects are hidden from the picker. Saved mixes still render them.</div>
+          <div id="settings-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="inline-input" style="display:none">
+      <textarea id="inline-field" rows="3" spellcheck="false"></textarea>
+      <div class="inline-actions">
+        <button id="inline-apply">OK</button>
+        <button id="inline-cancel">Cancel</button>
+        <span id="inline-error"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel">
+    <div id="tab-body">
+      <!-- pinned PRE module (global blur/grain/gamma/levels, always applied
+           first) — top of the workbench column, mirrors tooooools'
+           "Image Preprocessing" block. Built entirely by ui.js. Always
+           expanded — no collapse toggle. -->
+      <div class="section" id="pre-section"></div>
+
+      <div class="section">
+        <div class="target-header-row">
+          <span class="section-label" id="target-header">&mdash;</span>
+          <span class="target-header-spacer"></span>
+          <button id="presets-btn" class="mini-btn" title="Browse / save presets for this effect">Presets</button>
+          <button id="settings-reset-btn" class="mini-btn" title="Reset this effect's params to defaults">Reset</button>
+        </div>
+
+        <!-- effect editor: shown for NEW effect / EDIT layer targets -->
+        <div id="effect-editor">
+          <div id="active-params"></div>
+        </div>
+
+        <!-- output editor: shown when the pinned OUTPUT layer is selected -->
+        <div id="output-editor">
+          <div class="out-group-label">Crop</div>
+          <div class="out-row">
+            <span>Ratio</span>
+            <select id="crop-ratio"></select>
+          </div>
+          <div class="out-row" id="crop-custom-row">
+            <span>W × H</span>
+            <input id="crop-w" type="number" min="1" placeholder="W" />
+            <input id="crop-h" type="number" min="1" placeholder="H" />
+          </div>
+          <div class="out-row">
+            <span>Align</span>
+            <div id="align-picker" title="Crop anchor"></div>
+          </div>
+          <div class="out-group-label">Scale</div>
+          <div class="out-row">
+            <span>Mode</span>
+            <select id="scale-mode"></select>
+          </div>
+          <div class="out-row" id="scale-size-row">
+            <span>Longest px</span>
+            <input id="scale-size" type="number" min="1" placeholder="px" />
+          </div>
+          <div class="out-row" id="scale-exact-row">
+            <span>W × H</span>
+            <input id="scale-w" type="number" min="1" placeholder="W" />
+            <input id="scale-h" type="number" min="1" placeholder="H" />
+          </div>
+          <div class="out-group-label">Format</div>
+          <div class="out-row">
+            <span>Format</span>
+            <select id="format-select"></select>
+          </div>
+          <div class="out-row" id="quality-row">
+            <span>Quality</span>
+            <input id="quality-input" type="range" min="0.1" max="1" step="0.01" />
+            <span class="param-value" id="quality-value">0.92</span>
+          </div>
+          <div id="dims-readout">SRC &mdash; &times; &mdash; &rarr; OUT &mdash; &times; &mdash;</div>
+        </div>
+
+        <!-- ADD TO MIX sits directly under the settings panel — it commits
+             the effect being configured (NEW mode only; hidden for EDIT/OUTPUT). -->
+        <button id="add-btn">Add to mix &darr;</button>
+      </div>
+
+      <!-- LAYERS: the committed mix (◇ OUTPUT pinned on top) — bottom of the
+           workbench, just above the pinned EXPORT footer. -->
+      <div class="section">
+        <div class="section-label">Layers</div>
+        <div id="mix-list"></div>
+      </div>
+    </div>
+
+    <!-- pinned footer — always visible below the scrolling workbench. -->
+    <div id="editor-actions">
+      <button id="export-btn">Export</button>
+    </div>
+
+    <!-- per-effect PRESETS modal — brutalist overlay, absolute inside #panel
+         (same anchoring convention as the color-picker popover). -->
+    <div id="presets-backdrop" style="display:none"></div>
+    <div id="presets-modal" style="display:none">
+      <div class="presets-modal-header">
+        <span id="presets-modal-title">Presets</span>
+        <button id="presets-close-btn" class="icon-btn" title="Close">&#10005;</button>
+      </div>
+      <div id="presets-list"></div>
+      <button id="presets-save-btn" class="styles-full-btn">Save current as&hellip;</button>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <button id="new-image-btn" title="Load a different image">&#10005; New image</button>
+    <button id="settings-btn" title="Settings">&#9881;</button>
+    <div id="canvas-transform">
+      <canvas id="gl-canvas"></canvas>
+      <div id="crop-guide"><div id="crop-guide-anchor"></div></div>
+    </div>
+    <div id="dropzone">Drop an image here<br />or click to load</div>
+    <div id="viewport-controls">
+      <button id="zoom-fit-btn" title="Fit to view">Fit</button>
+      <button id="zoom-100-btn" title="Actual size">100%</button>
+      <input id="zoom-slider" type="range" min="5" max="400" step="1" value="100" title="Zoom" />
+      <span id="zoom-readout">100%</span>
+    </div>
+  </div>
+
+  <input id="file-input" type="file" accept="image/*" style="display:none" />
+</div>
+<div id="toast"></div>
+
+<!-- Classic scripts (no ES modules) so index.html opens by double-click over
+     file:// with no server, and also works hosted. Load order matters. -->
+<script src="src/gl.js"></script>
+<script src="src/assets.js"></script>
+<script src="src/effects.js"></script>
+<script src="src/pipeline.js"></script>
+<script src="src/preset.js"></script>
+<script src="src/ui.js"></script>
+</body>
+</html>

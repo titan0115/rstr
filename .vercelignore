@@ -1,0 +1,8 @@
+# RSTR deploys only the static editor. The batch engine is a local Node+puppeteer CLI.
+engine/
+scripts/
+test-assets/
+docs/
+node_modules/
+CLAUDE.md
+*.log

@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+engine/node_modules/
+
+# Vercel
+.vercel
+
+# Engine batch output
+out/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Logs
+*.log
+
+# Local tooling caches
+.impeccable/
+.claude/

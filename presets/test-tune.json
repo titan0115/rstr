@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "name": "test-tune",
+  "stack": [
+    { "effect": "dither", "enabled": true, "params": { "pattern": 0, "pixelSize": 8, "levels": 2, "contrast": 0.4, "colorMode": 0 } }
+  ],
+  "output": {
+    "crop": { "ratio": "original", "align": "C" },
+    "scale": { "mode": "none", "size": null, "width": null, "height": null },
+    "format": "png",
+    "quality": 0.92
+  },
+  "id": "rstr_test_tune"
+}

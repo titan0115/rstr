@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "name": "test-identity",
+  "stack": [],
+  "output": {
+    "crop": { "ratio": "original", "align": "C" },
+    "scale": { "mode": "none", "size": null, "width": null, "height": null },
+    "format": "png",
+    "quality": 0.92
+  },
+  "id": "rstr_test_identity"
+}

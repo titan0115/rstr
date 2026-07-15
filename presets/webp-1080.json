@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "name": "webp-1080",
+  "stack": [
+    {
+      "effect": "adjust",
+      "enabled": true,
+      "params": {
+        "brightness": 0.05,
+        "contrast": 0.3,
+        "saturation": -0.2,
+        "gamma": 1
+      }
+    },
+    {
+      "effect": "duotone",
+      "enabled": true,
+      "params": {
+        "colorA": "#101010",
+        "colorB": "#f0f0f0"
+      }
+    }
+  ],
+  "output": {
+    "crop": {
+      "ratio": "1:1",
+      "align": "C"
+    },
+    "scale": {
+      "mode": "fit",
+      "size": 1080,
+      "width": null,
+      "height": null
+    },
+    "format": "webp",
+    "quality": 0.85
+  },
+  "id": "rstr_6f77ab4f"
+}

@@ -1,0 +1,24 @@
+{
+  "v": 1,
+  "name": "rstr-icon-1bit",
+  "stack": [
+    {
+      "effect": "dither",
+      "enabled": true,
+      "params": {
+        "pattern": 0,
+        "pixelSize": 6,
+        "levels": 2,
+        "contrast": 0.4,
+        "colorMode": 0
+      }
+    }
+  ],
+  "output": {
+    "crop": { "ratio": "original", "align": "C" },
+    "scale": { "mode": "none", "size": null, "width": null, "height": null },
+    "format": "png",
+    "quality": 0.92
+  },
+  "id": "rstr_icon1bit_v1"
+}

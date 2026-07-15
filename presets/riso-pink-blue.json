@@ -1,0 +1,37 @@
+{
+  "v": 1,
+  "name": "riso-pink-blue",
+  "stack": [
+    {
+      "effect": "halftone",
+      "enabled": true,
+      "params": {
+        "inkCount": 2,
+        "ink1": "#ff48b0",
+        "ink2": "#0078bf",
+        "ink3": "#ffe800",
+        "paper": "#f2ede1",
+        "cellSize": 7,
+        "registration": 2.5,
+        "inkTexture": 0.35,
+        "seedOffset": 0,
+        "mode": 1
+      }
+    }
+  ],
+  "output": {
+    "crop": {
+      "ratio": "original",
+      "align": "C"
+    },
+    "scale": {
+      "mode": "none",
+      "size": null,
+      "width": null,
+      "height": null
+    },
+    "format": "png",
+    "quality": 0.92
+  },
+  "id": "rstr_6dd26753"
+}

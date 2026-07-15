@@ -1,0 +1,14 @@
+{
+  "name": "rstr-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RSTR headless batch renderer — applies a saved preset to a folder of images via system Chrome.",
+  "main": "rstr.js",
+  "scripts": {
+    "start": "node rstr.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.3.0"
+  }
+}

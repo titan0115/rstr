@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>RSTR render (headless)</title>
+</head>
+<body>
+<canvas id="gl-canvas"></canvas>
+
+<!-- Same shared core as the editor, loaded as classic scripts over file://.
+     Shader code + OUTPUT processing live ONCE in ../src (DRY invariant holds). -->
+<script src="../src/gl.js"></script>
+<script src="../src/assets.js"></script>
+<script src="../src/effects.js"></script>
+<script src="../src/pipeline.js"></script>
+<script src="../src/preset.js"></script>
+<script>
+(function (RSTR) {
+  'use strict';
+  var pipeline = new RSTR.Pipeline(document.getElementById('gl-canvas'));
+
+  function loadImageFromDataURL(dataURL) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('Failed to decode image')); };
+      img.src = dataURL;
+    });
+  }
+
+  // Exposed for engine/rstr.js via page.evaluate(). Runs the same pipeline the
+  // editor uses: crop -> resize -> effects -> encode(format@quality).
+  RSTR.render = function (dataURL, preset) {
+    var p = RSTR.preset.validatePreset(preset); // normalizes .output and .pre
+    return loadImageFromDataURL(dataURL).then(function (img) {
+      pipeline.setImage(img, img.naturalWidth, img.naturalHeight);
+      pipeline.setSeed(p.seed != null ? p.seed : 42);
+      pipeline.applyOutput(p.output);
+      // Global PRE block runs first, same as the editor's live stack —
+      // prepended only when non-identity (identity styles render unchanged).
+      var stack = RSTR.preset.preIsIdentity(p.pre)
+        ? p.stack
+        : [{ effect: 'preprocess', enabled: true, params: p.pre }].concat(p.stack);
+      pipeline.render(stack, p.source);
+      return pipeline.encode(p.output);
+    });
+  };
+
+  // patterns/distort need their ImageData assets decoded before the first
+  // render — gate readiness on assets.js finishing (engine renders only once).
+  (RSTR.assetsReady || Promise.resolve()).then(function () {
+    window.__RSTR_READY__ = true;
+  });
+})(window.RSTR);
+</script>
+</body>
+</html>

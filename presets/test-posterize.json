@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "name": "test-posterize",
+  "stack": [
+    { "effect": "posterize", "enabled": true, "params": { "levels": 2, "mono": 1 } }
+  ],
+  "output": {
+    "crop": { "ratio": "original", "align": "C" },
+    "scale": { "mode": "none", "size": null, "width": null, "height": null },
+    "format": "png",
+    "quality": 0.92
+  },
+  "id": "rstr_test_posterize"
+}
