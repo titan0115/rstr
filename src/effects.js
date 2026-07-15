@@ -1049,7 +1049,7 @@ void main() {
             { value: 1, label: 'Benday' },
           ],
         },
-        { key: 'gridAngle', label: 'Grid angle', type: 'range', min: -45, max: 45, step: 1, default: 0 },
+        { key: 'gridAngle', label: 'Grid angle', type: 'range', min: -90, max: 90, step: 1, default: 0 },
         { key: 'xSquares', label: 'X squares', type: 'range', min: 1, max: 100, step: 1, default: 90 },
         { key: 'ySquares', label: 'Y squares', type: 'range', min: 1, max: 100, step: 1, default: 90 },
         { key: 'minWidth', label: 'Min square width', type: 'range', min: 0, max: 50, step: 1, default: 1 },
