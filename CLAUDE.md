@@ -7,6 +7,20 @@ Formerly **SHDR**. A local, brutalist, grayscale, shader-based image processor.
 
 ---
 
+## Open source & deploy (public since 2026-07-15)
+
+RSTR is a **public, open-source** project — **https://github.com/kirillpes/rstr**, licensed **GPL-3.0** (copyleft: any distributed fork/derivative must also stay open). The editor is deployed on **Vercel** at **https://rstr.vercel.app** (GitHub-connected — a push to `main` auto-deploys to prod, a PR gets an auto preview deploy).
+
+**Owner workflow — commit & test exactly as before, zero PR friction.** Going open-source does NOT change how the owner works locally:
+- Edit `index.html` / `src/*`, test by double-clicking `index.html` (or on the live site after a push).
+- `git add -A && git commit -m "…"` → `git push` to `main` → Vercel auto-deploys. **Local == GitHub == live by construction** (the owner's stated invariant — keep it true).
+- `main` is **deliberately NOT branch-protected** — the owner pushes straight to it, no self-PR. Do not propose enabling branch protection unless he asks.
+- The ONE new habit, and only if outside contributors have merged PRs: **`git pull` before you push** (a push onto a stale `main` is rejected non-fast-forward). Nothing else about the loop changes.
+- **Static deploy = editor only.** `.vercelignore` keeps `engine/`, `node_modules/`, `docs/`, `CLAUDE.md` out of the Vercel upload. The engine (`engine/rstr.js` — Node + puppeteer + system Chrome) stays a LOCAL batch head; it is not, and should not be, deployed to Vercel.
+- Manual deploy fallback (if ever needed): `vercel --prod` from the project root. Outside contributors use **fork → PR**; grant direct push only by inviting a collaborator (`gh api -X PUT repos/kirillpes/rstr/collaborators/<user>`).
+
+---
+
 ## Run it
 
 - **Editor** — double-click `index.html`. No server, no build (classic `<script>`, works over `file://`), also hostable as static files. Desktop shortcut: `RSTR.lnk` (created 2026-07-10; target `index.html`, icon `icon/rstr.ico`).
